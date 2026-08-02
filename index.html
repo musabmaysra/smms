@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>صفحة العضو - الاجتماع الذكي</title>
+<style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Tahoma',sans-serif}
+    body{background:#F0F4F8;color:#222}
+    header{background:#0A4D68;color:#fff;padding:15px;text-align:center}
+    header h1{font-size:1.4em} header p{margin-top:5px}
+    .container{max-width:900px;margin:20px auto;padding:15px}
+    .info{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+    .info input{padding:10px;margin:5px;width:30%;border-radius:8px;border:1px solid #ccc}
+    .agenda-item{background:#fff;padding:15px;margin:15px 0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+    .agenda-item h3{color:#0A4D68;margin-bottom:10px}
+    .proposal-box{display:flex;gap:10px;margin-top:10px}
+    .proposal-box input{flex:1;padding:10px;border-radius:8px;border:1px solid #ccc}
+    .btn{background:#088395;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer}
+    .status{font-weight:bold;padding:20px;border-radius:8px;text-align:center;font-size:1.3em}
+    .waiting{background:#FFEAA7;color:#2D3436}
+    .reply{color:green;margin-top:5px;font-weight:bold}
+</style>
+</head>
+<body>
+<header>
+    <h1>الإدارة العامة لتقنية المعلومات والاتصالات - المكتب التنفيذي</h1>
+    <p>مرحبا بكم سادة أعضاء الاجتماع</p>
+</header>
+
+<div class="container">
+    <div id="status" class="status waiting">مرحبا بكم في الاجتماع الدوري - في انتظار بدء الاجتماع</div>
+    
+    <div class="info">
+        <h3>بيانات العضو</h3>
+        <input type="text" id="memberName" placeholder="الاسم">
+        <input type="text" id="memberRank" placeholder="الرتبة">
+        <input type="text" id="memberDept" placeholder="القسم">
+        <p id="meetingInfo" style="margin-top:10px;color:#0A4D68"></p>
+    </div>
+
+    <div id="agenda"></div>
+</div>
+
+<script>
+const agendaItems = [
+    {title:"افتتاح الاجتماع", time:5},
+    {title:"استعراض الأداء العام", time:20},
+    {title:"مناقشة التحديات الفنية", time:25},
+    {title:"بحث المشكلات الإدارية", time:25},
+    {title:"اقتراح حلول عملية", time:20},
+    {title:"التوصيات الختامية", time:15}
+];
+let meetingId = localStorage.getItem('meetingId');
+
+function saveData(key, data){ localStorage.setItem(key, JSON.stringify(data)); }
+function loadData(key){ return JSON.parse(localStorage.getItem(key)) || []; }
+
+function renderAgenda(){
+    const agendaDiv = document.getElementById('agenda');
+    agendaDiv.innerHTML = '';
+    agendaItems.forEach((item, index)=>{
+        const suggestions = loadData(`suggestions_${meetingId}_${index}`).filter(s=>s.memberId===localStorage.getItem('memberId'));
+        let html = `<div class="agenda-item">
+            <h3>🗂️ ${item.title} – ⏰ ${item.time} دقائق</h3>
+            <div class="proposal-box">
+                <input type="text" id="proposal_${index}" placeholder="اكتب اقتراحك هنا">
+                <button class="btn" onclick="sendProposal(${index})">ارسال</button>
+            </div>`;
+        suggestions.forEach(s=>{
+            html += `<div style="margin-top:10px;background:#E0F2F1;padding:8px;border-radius:5px">
+                ${s.text} <small>${s.time}</small>
+                ${s.reply ? `<div class="reply">رد المدير: ${s.reply}</div>` : ''}
+            </div>`;
+        });
+        html += `</div>`;
+        agendaDiv.innerHTML += html;
+    });
+}
+
+function sendProposal(index){
+    const name = document.getElementById('memberName').value;
+    const rank = document.getElementById('memberRank').value;
+    const dept = document.getElementById('memberDept').value;
+    const text = document.getElementById(`proposal_${index}`).value;
+    if(!name || !rank || !dept){ alert('ادخل بياناتك اولا'); return; }
+    if(!text){ alert('اكتب اقتراحك'); return; }
+    
+    localStorage.setItem('memberId', name+rank);
+    const key = `suggestions_${meetingId}_${index}`;
+    const suggestions = loadData(key);
+    suggestions.push({name, rank, dept, text, time:new Date().toLocaleTimeString(), memberId:localStorage.getItem('memberId')});
+    saveData(key, suggestions);
+    document.getElementById(`proposal_${index}`).value = '';
+    renderAgenda();
+}
+
+// تحديث تلقائي
+setInterval(()=>{
+    const status = localStorage.getItem('meetingStatus');
+    const info = loadData(`meetingInfo_${meetingId}`);
+    const statusDiv = document.getElementById('status');
+    
+    if(info.title) document.getElementById('meetingInfo').innerText = `الاجتماع: ${info.title} - ${info.date} ${info.time}`;
+    
+    if(status==='active'){
+        statusDiv.className = 'status active';
+        statusDiv.innerText = 'الاجتماع جاري - يمكنك ارسال المقترحات';
+        renderAgenda();
+    }else if(status==='ended'){
+        statusDiv.className = 'status ended';
+        statusDiv.innerText = 'شكرا لكم على وقتكم - انتهى الاجتماع نراكم في اجتماعات أخرى';
+        document.getElementById('agenda').innerHTML = '';
+    }else{
+        statusDiv.className = 'status waiting';
+        statusDiv.innerText = 'مرحبا بكم في الاجتماع الدوري - في انتظار بدء الاجتماع';
+    }
+}, 3000);
+</script>
+</body>
+</html>
