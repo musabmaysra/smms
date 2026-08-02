@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة المدير - الاجتماع الذكي</title>
+<style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Tahoma',sans-serif}
+    body{background:#F0F4F8;color:#222}
+    header{background:#0A4D68;color:#fff;padding:15px;text-align:center}
+    header h1{font-size:1.4em} header p{margin-top:5px}
+    .container{max-width:1200px;margin:20px auto;padding:15px}
+    .controls{background:#fff;padding:20px;border-radius:10px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+    .controls input, .controls button{padding:10px;margin:5px;border-radius:8px;border:1px solid #ccc}
+    .btn{background:#088395;color:#fff;border:none;cursor:pointer;font-weight:bold}
+    .btn:hover{opacity:0.9}
+    .btn-danger{background:#D62828}
+    .btn-success{background:#2A9D8F}
+    .dropdown{position:relative;display:inline-block}
+    .dropdown-content{display:none;position:absolute;background:#fff;box-shadow:0 8px 16px rgba(0,0,0,0.2);z-index:1;border-radius:8px}
+    .dropdown-content button{display:block;width:200px;text-align:right}
+    .dropdown:hover .dropdown-content{display:block}
+    .agenda-item{background:#fff;padding:15px;margin:15px 0;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+    .agenda-item h3{color:#0A4D68;margin-bottom:10px}
+    .suggestions{margin-top:10px;background:#F8F9FA;padding:10px;border-radius:8px}
+    .suggestion{border-bottom:1px dashed #ccc;padding:8px 0}
+    .suggestion b{color:#088395}
+    .reply-box{display:flex;gap:5px;margin-top:5px}
+    .status{font-weight:bold;padding:10px;border-radius:8px;text-align:center;margin:10px 0}
+    .waiting{background:#FFEAA7;color:#2D3436}
+    .active{background:#55EFC4;color:#2D3436}
+    .ended{background:#FF7675;color:#fff}
+</style>
+</head>
+<body>
+<header>
+    <h1>الإدارة العامة لتقنية المعلومات والاتصالات - المكتب التنفيذي</h1>
+    <p>مرحبا بكم سعادة المدير - لوحة التحكم</p>
+</header>
+
+<div class="container">
+    <div id="status" class="status waiting">في انتظار بدء الاجتماع</div>
+    
+    <div class="controls">
+        <input type="text" id="meetingTitle" placeholder="عنوان الاجتماع">
+        <input type="date" id="meetingDate">
+        <input type="time" id="meetingTime">
+        <button class="btn btn-success" onclick="startMeeting()">بدء الاجتماع</button>
+        <button class="btn btn-danger" onclick="endMeeting()">انهاء الاجتماع</button>
+        <button class="btn" onclick="pauseMeeting()">ايقاف مؤقت</button>
+        <div class="dropdown">
+            <button class="btn">+ خيارات</button>
+            <div class="dropdown-content">
+                <button onclick="newMeeting()">اجتماع جديد</button>
+                <button onclick="searchMeeting()">البحث عن اجتماع</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="agenda"></div>
+</div>
+
+<script>
+const agendaItems = [
+    {title:"افتتاح الاجتماع", time:5},
+    {title:"استعراض الأداء العام", time:20},
+    {title:"مناقشة التحديات الفنية", time:25},
+    {title:"بحث المشكلات الإدارية", time:25},
+    {title:"اقتراح حلول عملية", time:20},
+    {title:"التوصيات الختامية", time:15}
+];
+let meetingId = localStorage.getItem('meetingId') || Date.now();
+
+function saveData(key, data){ localStorage.setItem(key, JSON.stringify(data)); }
+function loadData(key){ return JSON.parse(localStorage.getItem(key)) || []; }
+
+function renderAgenda(){
+    const agendaDiv = document.getElementById('agenda');
+    agendaDiv.innerHTML = '';
+    agendaItems.forEach((item, index)=>{
+        const suggestions = loadData(`suggestions_${meetingId}_${index}`);
+        let html = `<div class="agenda-item">
+            <h3>🗂️ ${item.title} – ⏰ ${item.time} دقائق</h3>
+            <div class="suggestions"><h4>المقترحات الواردة:</h4>`;
+        suggestions.forEach((s,i)=>{
+            html += `<div class="suggestion">
+                <b>${s.name} - ${s.rank} - ${s.dept}</b> <br>
+                ${s.text} <small>${s.time}</small>
+                <div class="reply-box">
+                    <input type="text" id="reply_${index}_${i}" placeholder="رد على العضو">
+                    <button class="btn" onclick="sendReply(${index},${i})">ارسال</button>
+                </div>
+                ${s.reply ? `<p style="color:green;margin-top:5px">ردك: ${s.reply}</p>` : ''}
+            </div>`;
+        });
+        html += `</div></div>`;
+        agendaDiv.innerHTML += html;
+    });
+}
+
+function startMeeting(){
+    saveData(`meetingInfo_${meetingId}`, {
+        title:document.getElementById('meetingTitle').value,
+        date:document.getElementById('meetingDate').value,
+        time:document.getElementById('meetingTime').value,
+        status:'active'
+    });
+    updateStatus('active', 'الاجتماع بدأ - الاعضاء يمكنهم المشاركة');
+    localStorage.setItem('meetingStatus', 'active');
+}
+
+function endMeeting(){
+    localStorage.setItem('meetingStatus', 'ended');
+    updateStatus('ended', 'انتهى الاجتماع - شكرا لكم');
+}
+
+function pauseMeeting(){
+    localStorage.setItem('meetingStatus', 'paused');
+    updateStatus('waiting', 'الاجتماع متوقف مؤقتا');
+}
+
+function updateStatus(state, msg){
+    const status = document.getElementById('status');
+    status.className = `status ${state}`;
+    status.innerText = msg;
+}
+
+function sendReply(agendaIndex, suggestionIndex){
+    const suggestions = loadData(`suggestions_${meetingId}_${agendaIndex}`);
+    const replyText = document.getElementById(`reply_${agendaIndex}_${suggestionIndex}`).value;
+    suggestions[suggestionIndex].reply = replyText;
+    saveData(`suggestions_${meetingId}_${agendaIndex}`, suggestions);
+    renderAgenda();
+}
+
+function newMeeting(){
+    meetingId = Date.now();
+    localStorage.setItem('meetingId', meetingId);
+    alert('تم انشاء اجتماع جديد برقم: ' + meetingId);
+    location.reload();
+}
+
+function searchMeeting(){
+    const id = prompt('ادخل رقم الاجتماع للبحث:');
+    if(id){ meetingId = id; localStorage.setItem('meetingId', meetingId); renderAgenda(); }
+}
+
+// تحديث تلقائي كل 3 ثواني
+setInterval(()=>{
+    const status = localStorage.getItem('meetingStatus');
+    const info = loadData(`meetingInfo_${meetingId}`);
+    if(info.title) document.getElementById('meetingTitle').value = info.title;
+    if(info.date) document.getElementById('meetingDate').value = info.date;
+    if(info.time) document.getElementById('meetingTime').value = info.time;
+    renderAgenda();
+}, 3000);
+
+renderAgenda();
+</script>
+</body>
+</html>
